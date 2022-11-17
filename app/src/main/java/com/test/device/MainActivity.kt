@@ -2,9 +2,7 @@ package com.test.device
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothDevice
-import android.bluetooth.BluetoothManager
+import android.bluetooth.*
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -46,6 +44,21 @@ class MainActivity : AppCompatActivity() {
             checkPermission()
         }
 
+    private val bluetoothListener = object : BluetoothProfile.ServiceListener {
+        override fun onServiceConnected(profile: Int, proxy: BluetoothProfile?) {
+            Log.d("my_test", "onServiceConnected")
+        }
+
+        override fun onServiceDisconnected(profile: Int) {
+            Log.d("my_test", "onServiceConnected")
+        }
+    }
+
+    // SDK 怎麼知道 device 的相關資訊？並且 sync 到它
+    private val myDeviceMacAddress = "C0:26:DF:00:B3:D4" // this is foraGD40b
+
+    private var bluetoothDevice: BluetoothDevice? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -80,12 +93,24 @@ class MainActivity : AppCompatActivity() {
                             "my_test",
                             "BroadcastReceiver[deviceName=$deviceName, Address=$deviceHardwareAddress]"
                         )
+                        if (deviceHardwareAddress == myDeviceMacAddress) {
+                            printDeviceInfo(device)
+                            start(device)
+                            bluetoothAdapter.cancelDiscovery()
+                        }
+
                     } else {
                         Log.d("my_test", "BroadcastReceiver device is null")
                     }
                 }
             }
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun start(device: BluetoothDevice) {
+        //TODO https://developer.android.com/guide/topics/connectivity/bluetooth/connect-bluetooth-devices#connect-server
+//        bluetoothAdapter.listenUsingRfcommWithServiceRecord()
     }
 
     private fun registerBleReceiver() {
@@ -97,10 +122,10 @@ class MainActivity : AppCompatActivity() {
     private fun showDialog() {
         AlertDialog.Builder(this)
             .setMessage("permission!")
-            .setPositiveButton("ok") { dialog, which ->
+            .setPositiveButton("ok") { _, _ ->
                 checkBluetooth()
             }
-            .setNegativeButton("Bye!") { dialog, which ->
+            .setNegativeButton("Bye!") { _, _ ->
                 finish()
             }
             .show()
@@ -148,5 +173,16 @@ class MainActivity : AppCompatActivity() {
         registerBleReceiver()
         val isStart = bluetoothAdapter.startDiscovery()
         Log.e("my_test", "isStartDiscovery ? $isStart")
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun printDeviceInfo(device: BluetoothDevice) {
+        Log.e("my_test", "=== ${device.name} ===")
+        Log.e("my_test", "address=${device.address}")
+        Log.e("my_test", "alias=${device.alias}")
+        Log.e("my_test", "type=${device.type}")
+        Log.e("my_test", "bluetoothClass=${device.bluetoothClass}")
+        Log.e("my_test", "bondState=${device.bondState}")
+        Log.e("my_test", "uuids=${device.uuids}")
     }
 }
