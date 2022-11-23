@@ -20,6 +20,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.*
+import kotlin.experimental.and
 
 @SuppressLint("MissingPermission")
 class MainActivity : AppCompatActivity() {
@@ -79,6 +80,8 @@ class MainActivity : AppCompatActivity() {
 
     private var bluetoothDevice: BluetoothDevice? = null
     private var connectThread: ConnectThread? = null
+
+    private var glucoseMeasurementCharacteristic: BluetoothGattCharacteristic? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -162,13 +165,46 @@ class MainActivity : AppCompatActivity() {
                         service.characteristics.forEach { characteristic ->
                             if (GLUCOSE_MEASUREMENT_UUID == characteristic.uuid) {
                                 Log.e("my_test", "FIND GLUCOSE_MEASUREMENT_UUID !!!")
-                                gatt.connect()
-                                gatt.readCharacteristic(characteristic)
+                                glucoseMeasurementCharacteristic = characteristic
                             } else {
 //                                Log.d("my_test", "FIND ${characteristic.uuid}")
                             }
                         }
                     }
+
+                    if (glucoseMeasurementCharacteristic == null) {
+                        gatt?.disconnect()
+                        Log.e("my_test", "disconnect(bg characteristic not found) !!!")
+                        return
+                    }
+
+//                    glucoseMeasurementCharacteristic?.let {
+//                        gatt?.setCharacteristicNotification(it, true)
+//                        val descriptor = it.getDescriptor(CLIENT_CHARACTERISTIC_CONFIG_DESCRIPTOR_UUID)
+//                        descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+//                        gatt?.readDescriptor(descriptor)
+//                    }
+
+                    glucoseMeasurementCharacteristic?.let {
+                        val sequenceNum = it.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, 1)
+
+                        val baseDateTime: Date = getDateTimeFromCharacteristic(it, 3)
+
+                        val flag = it.value[0]
+//                        if (flag and 0x01 != 0) {
+//                            timeOffset =
+//                                characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_SINT16, index)
+//                            index += 2
+//                        }
+
+//                        var gluco = it.getFloatValue(BluetoothGattCharacteristic.FORMAT_SFLOAT, index)
+//                        if (unit == 0) {
+//                            gluco *= 100000f // kg/L => mm/gL
+//                        }
+
+                        Log.e("my_test", "sequenceNum=$sequenceNum")
+                        Log.e("my_test", "baseDateTime=$baseDateTime")
+                    } ?: Log.e("my_test", "glucoseMeasurementCharacteristic is null")
                 }
             }
 
@@ -384,5 +420,32 @@ class MainActivity : AppCompatActivity() {
                 Log.e("my_test", "Could not close the client socket", e)
             }
         }
+    }
+
+    private fun getDateTimeFromCharacteristic(
+        characteristic: BluetoothGattCharacteristic,
+        startIndex: Int
+    ): Date {
+        var startIndex = startIndex
+        val year = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, startIndex)
+        startIndex += 2
+        val month =
+            characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, startIndex++)
+        val day = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, startIndex++)
+        val hours =
+            characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, startIndex++)
+        val minutes =
+            characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, startIndex++)
+        val seconds =
+            characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, startIndex++)
+        // DateTime(year, month, day, hours, minutes, seconds)
+        return Calendar.getInstance().apply {
+            set(Calendar.YEAR, year)
+            set(Calendar.MONTH, month)
+            set(Calendar.DAY_OF_MONTH, day)
+            set(Calendar.HOUR_OF_DAY, hours)
+            set(Calendar.MINUTE, minutes)
+            set(Calendar.SECOND, seconds)
+        }.time
     }
 }
